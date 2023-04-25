@@ -4156,6 +4156,7 @@ static jl_cgval_t emit_call_specfun_other(jl_codectx_t &ctx, bool is_opaque_clos
 
     for (size_t i = 0; i < nargs; i++) {
         jl_value_t *jt = jl_nth_slot_type(specTypes, i);
+        // n.b.: specTypes is required to be a datatype by construction for specsig
         jl_cgval_t arg = argv[i];
         if (is_opaque_closure && i == 0) {
             Type *at = cft->getParamType(idx);
@@ -4165,7 +4166,8 @@ static jl_cgval_t emit_call_specfun_other(jl_codectx_t &ctx, bool is_opaque_clos
             // rather than a boxed value.
             arg = value_to_pointer(ctx, arg);
             argvals[idx] = decay_derived(ctx, maybe_bitcast(ctx, data_pointer(ctx, arg), at));
-        } else if (is_uniquerep_Type(jt)) {
+        }
+        else if (is_uniquerep_Type(jt)) {
             continue;
         } else {
             bool isboxed = deserves_argbox(jt);
@@ -5805,6 +5807,7 @@ static void emit_cfunc_invalidate(
         ++AI;
     for (size_t i = 0; i < nargs; i++) {
         jl_value_t *jt = jl_nth_slot_type(calltype, i);
+        // n.b. specTypes is required to be a datatype by construction for specsig
         bool isboxed = false;
         Type *et;
         if (i == 0 && is_for_opaque_closure) {
@@ -6310,6 +6313,7 @@ static Function* gen_cfun_wrapper(
             Value *arg;
             jl_value_t *spect = (i == 0 && is_opaque_closure) ? (jl_value_t*)jl_any_type :
                 jl_nth_slot_type(lam->specTypes, i);
+            // n.b. specTypes is required to be a datatype by construction for specsig
             bool isboxed = deserves_argbox(spect);
             Type *T = isboxed ? ctx.types().T_prjlvalue : julia_type_to_llvm(ctx, spect);
             if (is_uniquerep_Type(spect)) {
@@ -6730,6 +6734,7 @@ static Function *gen_invoke_wrapper(jl_method_instance_t *lam, jl_value_t *jlret
     for (size_t i = 0; i < jl_nparams(lam->specTypes) && idx < nfargs; ++i) {
         jl_value_t *ty = ((i == 0) && is_opaque_closure) ? (jl_value_t*)jl_any_type :
             jl_nth_slot_type(lam->specTypes, i);
+        // n.b. specTypes is required to be a datatype by construction for specsig
         bool isboxed = deserves_argbox(ty);
         Type *lty = isboxed ?  ctx.types().T_prjlvalue : julia_type_to_llvm(ctx, ty);
         if (type_is_ghost(lty) || is_uniquerep_Type(ty))
@@ -7001,6 +7006,7 @@ static jl_datatype_t *compute_va_type(jl_method_instance_t *lam, size_t nreq)
     JL_GC_PUSH1(&tupargs);
     for (size_t i = nreq; i < jl_nparams(lam->specTypes); ++i) {
         jl_value_t *argType = jl_nth_slot_type(lam->specTypes, i);
+        // n.b. specTypes is required to be a datatype by construction for specsig
         if (is_uniquerep_Type(argType))
             argType = jl_typeof(jl_tparam0(argType));
         else if (jl_has_intersect_type_not_kind(argType)) {
@@ -7139,6 +7145,8 @@ static jl_llvm_functions_t
         if (argname == jl_unused_sym)
             continue;
         jl_value_t *ty = jl_nth_slot_type(lam->specTypes, i);
+        // TODO: jl_nth_slot_type should call jl_rewrap_unionall
+        //  specTypes is required to be a datatype by construction for specsig, but maybe not otherwise
         // OpaqueClosure implicitly loads the env
         if (i == 0 && ctx.is_opaque_closure) {
             if (jl_is_array(src->slottypes)) {
@@ -7604,6 +7612,8 @@ static jl_llvm_functions_t
     for (i = 0; i < nreq; i++) {
         jl_sym_t *s = slot_symbol(ctx, i);
         jl_value_t *argType = jl_nth_slot_type(lam->specTypes, i);
+        // TODO: jl_nth_slot_type should call jl_rewrap_unionall?
+        //  specTypes is required to be a datatype by construction for specsig, but maybe not otherwise
         bool isboxed = deserves_argbox(argType);
         Type *llvmArgType = NULL;
         if (i == 0 && ctx.is_opaque_closure) {
@@ -7720,6 +7730,7 @@ static jl_llvm_functions_t
             SmallVector<jl_cgval_t> vargs(ctx.nvargs);
             for (size_t i = nreq; i < jl_nparams(lam->specTypes); ++i) {
                 jl_value_t *argType = jl_nth_slot_type(lam->specTypes, i);
+                // n.b. specTypes is required to be a datatype by construction for specsig
                 bool isboxed = deserves_argbox(argType);
                 Type *llvmArgType = isboxed ?  ctx.types().T_prjlvalue : julia_type_to_llvm(ctx, argType);
                 vargs[i - nreq] = get_specsig_arg(argType, llvmArgType, isboxed);

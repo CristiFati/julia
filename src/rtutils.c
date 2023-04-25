@@ -129,6 +129,8 @@ JL_DLLEXPORT void JL_NORETURN jl_type_error(const char *fname,
 
 JL_DLLEXPORT void JL_NORETURN jl_undefined_var_error(jl_sym_t *var)
 {
+    if (!jl_undefvarerror_type)
+        jl_errorf("UndefVarError(%s)", jl_symbol_name(var));
     jl_throw(jl_new_struct(jl_undefvarerror_type, var));
 }
 
