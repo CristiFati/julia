@@ -1979,9 +1979,7 @@ jl_cgval_t function_sig_t::emit_a_ccall(
             // XXX: result needs to be zero'd and given a GC root here
             // and has incorrect write barriers.
             // instead this code path should behave like `unsafe_load`
-            assert(jl_datatype_size(rt) > 0 && "sret shouldn't be a singleton instance");
-            result = emit_allocobj(ctx, jl_datatype_size(rt),
-                                   literal_pointer_val(ctx, (jl_value_t*)rt));
+            result = emit_allocobj(ctx, (jl_datatype_t*)rt);
             sretty = ctx.types().T_jlvalue;
             sretboxed = true;
             gc_uses.push_back(result);
@@ -2143,15 +2141,13 @@ jl_cgval_t function_sig_t::emit_a_ccall(
         else if (jlretboxed && !retboxed) {
             assert(jl_is_datatype(rt));
             if (static_rt) {
-                Value *runtime_bt = literal_pointer_val(ctx, rt);
-                size_t rtsz = jl_datatype_size(rt);
-                assert(rtsz > 0);
-                Value *strct = emit_allocobj(ctx, rtsz, runtime_bt);
+                Value *strct = emit_allocobj(ctx, (jl_datatype_t*)rt);
                 MDNode *tbaa = jl_is_mutable(rt) ? ctx.tbaa().tbaa_mutab : ctx.tbaa().tbaa_immut;
                 int boxalign = julia_alignment(rt);
                 // copy the data from the return value to the new struct
                 const DataLayout &DL = ctx.builder.GetInsertBlock()->getModule()->getDataLayout();
                 auto resultTy = result->getType();
+                size_t rtsz = jl_datatype_size(rt);
                 if (DL.getTypeStoreSize(resultTy) > rtsz) {
                     // ARM and AArch64 can use a LLVM type larger than the julia type.
                     // When this happens, cast through memory.
