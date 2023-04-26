@@ -194,7 +194,7 @@ typedef struct {
     const jl_image_header_t *header;
     // The shard table, contains per-shard data
     const jl_image_shard_t *shards; // points to header->nshards length array
-    // The TLS data
+    // The TLS data pointer
     const jl_image_ptls_t *ptls;
 
     //  serialized target data

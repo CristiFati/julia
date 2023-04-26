@@ -21,7 +21,6 @@
     XX(jl_apply_type1) \
     XX(jl_apply_type2) \
     XX(jl_argument_datatype) \
-    XX(jl_argument_method_table) \
     XX(jl_arraylen) \
     XX(jl_arrayref) \
     XX(jl_arrayset) \

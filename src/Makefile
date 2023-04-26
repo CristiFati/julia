@@ -170,8 +170,8 @@ DOBJS := $(SRCS:%=$(BUILDDIR)/%.dbg.obj)
 CODEGEN_OBJS := $(CODEGEN_SRCS:%=$(BUILDDIR)/%.o)
 CODEGEN_DOBJS := $(CODEGEN_SRCS:%=$(BUILDDIR)/%.dbg.obj)
 
-DEBUGFLAGS += $(FLAGS) -DLIBRARY_EXPORTS
-SHIPFLAGS += $(FLAGS) -DLIBRARY_EXPORTS
+SHIPFLAGS  += $(FLAGS)
+DEBUGFLAGS += $(FLAGS)
 
 # if not absolute, then relative to the directory of the julia executable
 SHIPFLAGS  += "-DJL_SYSTEM_IMAGE_PATH=\"$(build_private_libdir_rel)/sys.$(SHLIB_EXT)\""
@@ -222,13 +222,13 @@ $(BUILDDIR)/jl_internal_funcs.inc: $(SRCDIR)/jl_exported_funcs.inc
 
 # source file rules
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c $(HEADERS) | $(BUILDDIR)
-	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(JCFLAGS) $(JL_CFLAGS) $(SHIPFLAGS) $(DISABLE_ASSERTIONS) -c $< -o $@)
+	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(JCFLAGS) $(JL_CFLAGS) $(SHIPFLAGS) $(EXPORTS) $(DISABLE_ASSERTIONS) -c $< -o $@)
 $(BUILDDIR)/%.dbg.obj: $(SRCDIR)/%.c $(HEADERS) | $(BUILDDIR)
-	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(JCFLAGS) $(JL_CFLAGS) $(DEBUGFLAGS) -c $< -o $@)
+	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(JCFLAGS) $(JL_CFLAGS) $(DEBUGFLAGS) $(EXPORTS) -c $< -o $@)
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp $(SRCDIR)/llvm-version.h $(HEADERS) $(LLVM_CONFIG_ABSOLUTE) | $(BUILDDIR)
-	@$(call PRINT_CC, $(CXX) $(LLVM_CXXFLAGS) $(JCPPFLAGS) $(JCXXFLAGS) $(JL_CXXFLAGS) $(SHIPFLAGS) $(CXX_DISABLE_ASSERTION) -c $< -o $@)
+	@$(call PRINT_CC, $(CXX) $(LLVM_CXXFLAGS) $(JCPPFLAGS) $(JCXXFLAGS) $(JL_CXXFLAGS) $(SHIPFLAGS) $(EXPORTS) $(CXX_DISABLE_ASSERTION) -c $< -o $@)
 $(BUILDDIR)/%.dbg.obj: $(SRCDIR)/%.cpp $(SRCDIR)/llvm-version.h $(HEADERS) $(LLVM_CONFIG_ABSOLUTE) | $(BUILDDIR)
-	@$(call PRINT_CC, $(CXX) $(LLVM_CXXFLAGS) $(JCPPFLAGS) $(JCXXFLAGS) $(JL_CXXFLAGS) $(DEBUGFLAGS) -c $< -o $@)
+	@$(call PRINT_CC, $(CXX) $(LLVM_CXXFLAGS) $(JCPPFLAGS) $(JCXXFLAGS) $(JL_CXXFLAGS) $(DEBUGFLAGS) $(EXPORTS) -c $< -o $@)
 $(BUILDDIR)/%.o : $(SRCDIR)/%.d
 	@$(call PRINT_DTRACE, $(DTRACE) -G -s $< -o $@)
 $(BUILDDIR)/%.dbg.obj : $(SRCDIR)/%.d
@@ -416,6 +416,10 @@ endif
 libjulia-codegen-release: $(build_shlibdir)/libjulia-codegen.$(JL_MAJOR_MINOR_SHLIB_EXT)
 libjulia-codegen-debug: $(build_shlibdir)/libjulia-codegen-debug.$(JL_MAJOR_MINOR_SHLIB_EXT)
 libjulia-codegen-debug libjulia-codegen-release: $(PUBLIC_HEADER_TARGETS)
+
+# set the EXPORTS variable for the source files based on where they are getting linked
+$(OBJS) $(DOBJS): EXPORTS := -DJL_LIBRARY_EXPORTS_INTERNAL
+$(CODEGEN_OBJS) $(CODEGEN_DOBJS): EXPORTS := -DJL_LIBRARY_EXPORTS_CODEGEN
 
 clean:
 	-rm -fr $(build_shlibdir)/libjulia-internal* $(build_shlibdir)/libjulia-codegen* $(build_shlibdir)/libccalltest* $(build_shlibdir)/libllvmcalltest*

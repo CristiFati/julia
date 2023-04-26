@@ -3,7 +3,10 @@
 #ifndef JULIA_H
 #define JULIA_H
 
-#ifdef LIBRARY_EXPORTS
+#if defined(JL_LIBRARY_EXPORTS_INTERNAL) || defined(JL_LIBRARY_EXPORTS_CODEGEN)
+#define JL_LIBRARY_EXPORTS
+#endif
+#ifdef JL_LIBRARY_EXPORTS
 // Generated file, needs to be searched in include paths so that the builddir
 // retains priority
 #include <jl_internal_funcs.inc>
@@ -70,7 +73,7 @@
 typedef struct _jl_taggedvalue_t jl_taggedvalue_t;
 typedef struct _jl_tls_states_t *jl_ptls_t;
 
-#ifdef LIBRARY_EXPORTS
+#ifdef JL_LIBRARY_EXPORTS
 #include "uv.h"
 #endif
 #include "julia_atomics.h"
@@ -1622,10 +1625,10 @@ JL_DLLEXPORT size_t jl_array_size(jl_value_t *a, int d);
 JL_DLLEXPORT const char *jl_string_ptr(jl_value_t *s);
 
 // modules and global variables
-extern JL_DLLEXPORT jl_module_t *jl_main_module JL_GLOBALLY_ROOTED;
-extern JL_DLLEXPORT jl_module_t *jl_core_module JL_GLOBALLY_ROOTED;
-extern JL_DLLEXPORT jl_module_t *jl_base_module JL_GLOBALLY_ROOTED;
-extern JL_DLLEXPORT jl_module_t *jl_top_module JL_GLOBALLY_ROOTED;
+extern JL_DLLIMPORT jl_module_t *jl_main_module JL_GLOBALLY_ROOTED;
+extern JL_DLLIMPORT jl_module_t *jl_core_module JL_GLOBALLY_ROOTED;
+extern JL_DLLIMPORT jl_module_t *jl_base_module JL_GLOBALLY_ROOTED;
+extern JL_DLLIMPORT jl_module_t *jl_top_module JL_GLOBALLY_ROOTED;
 JL_DLLEXPORT jl_module_t *jl_new_module(jl_sym_t *name, jl_module_t *parent);
 JL_DLLEXPORT void jl_set_module_nospecialize(jl_module_t *self, int on);
 JL_DLLEXPORT void jl_set_module_optlevel(jl_module_t *self, int lvl);
@@ -1688,7 +1691,7 @@ JL_DLLEXPORT long jl_getallocationgranularity(void) JL_NOTSAFEPOINT;
 JL_DLLEXPORT int jl_is_debugbuild(void) JL_NOTSAFEPOINT;
 JL_DLLEXPORT jl_sym_t *jl_get_UNAME(void) JL_NOTSAFEPOINT;
 JL_DLLEXPORT jl_sym_t *jl_get_ARCH(void) JL_NOTSAFEPOINT;
-JL_DLLEXPORT jl_value_t *jl_get_libllvm(void) JL_NOTSAFEPOINT;
+JL_DLLIMPORT jl_value_t *jl_get_libllvm(void) JL_NOTSAFEPOINT;
 extern JL_DLLIMPORT int jl_n_threadpools;
 extern JL_DLLIMPORT _Atomic(int) jl_n_threads;
 extern JL_DLLIMPORT int jl_n_gcthreads;
@@ -1762,7 +1765,7 @@ typedef enum {
     //JL_IMAGE_LIBJULIA = 2,
 } JL_IMAGE_SEARCH;
 
-JL_DLLEXPORT const char *jl_get_libdir(void);
+JL_DLLIMPORT const char *jl_get_libdir(void);
 JL_DLLEXPORT void julia_init(JL_IMAGE_SEARCH rel);
 JL_DLLEXPORT void jl_init(void);
 JL_DLLEXPORT void jl_init_with_image(const char *julia_bindir,
@@ -2017,7 +2020,7 @@ void (jl_longjmp)(jmp_buf _Buf, int _Value);
 JL_DLLEXPORT int (ijl_setjmp)(jmp_buf _Buf);
 void (ijl_longjmp)(jmp_buf _Buf, int _Value);
 #endif
-#ifdef LIBRARY_EXPORTS
+#ifdef JL_LIBRARY_EXPORTS
 #define jl_setjmp_f ijl_setjmp
 #define jl_setjmp_name "ijl_setjmp"
 #define jl_setjmp(a,b) ijl_setjmp(a)

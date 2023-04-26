@@ -502,6 +502,7 @@ void CloneCtx::prepare_slots()
                 auto id = get_func_id(F);
                 auto GV = new GlobalVariable(M, F->getType(), false, GlobalValue::ExternalLinkage, Constant::getNullValue(F->getType()), F->getName() + ".reloc_slot");
                 GV->setVisibility(GlobalValue::HiddenVisibility);
+                GV->setDSOLocal(true);
                 const_relocs[id] = GV;
             }
         }
@@ -525,6 +526,7 @@ void CloneCtx::clone_decls()
             auto new_F = Function::Create(F->getFunctionType(), F->getLinkage(), F->getName() + suffixes[i], &M);
             new_F->copyAttributesFrom(F);
             new_F->setVisibility(F->getVisibility());
+            new_F->setDSOLocal(true);
             auto base_func = F;
             if (specs[i].flags & JL_TARGET_CLONE_ALL)
                 base_func = static_cast<Group*>(linearized[specs[i].base])->base_func(F);
@@ -668,6 +670,7 @@ void CloneCtx::rewrite_alias(GlobalAlias *alias, Function *F)
     trampoline->copyAttributesFrom(F);
     trampoline->takeName(alias);
     trampoline->setVisibility(alias->getVisibility());
+    trampoline->setDSOLocal(alias->isDSOLocal());
     // drop multiversioning attributes, add alias attribute for testing purposes
     trampoline->removeFnAttr("julia.mv.reloc");
     trampoline->removeFnAttr("julia.mv.clones");
@@ -886,9 +889,11 @@ static Constant *emit_offset_table(Module &M, Type *T_size, const std::vector<T*
                                        name + "_base" + suffix,
                                        base, &M);
         ga->setVisibility(GlobalValue::HiddenVisibility);
+        ga->setDSOLocal(true);
     } else {
         auto gv = new GlobalVariable(M, T_size, true, GlobalValue::ExternalLinkage, Constant::getNullValue(T_size), name + "_base" + suffix);
         gv->setVisibility(GlobalValue::HiddenVisibility);
+        gv->setDSOLocal(true);
         base = gv;
     }
     auto vbase = ConstantExpr::getPtrToInt(base, T_size);
@@ -905,6 +910,7 @@ static Constant *emit_offset_table(Module &M, Type *T_size, const std::vector<T*
                                   ConstantArray::get(vars_type, offsets),
                                   name + "_offsets" + suffix);
     gv->setVisibility(GlobalValue::HiddenVisibility);
+    gv->setDSOLocal(true);
     return vbase;
 }
 
@@ -966,6 +972,7 @@ void CloneCtx::emit_metadata()
                                       ConstantArray::get(vars_type, values),
                                       "jl_clone_slots" + suffix);
         gv->setVisibility(GlobalValue::HiddenVisibility);
+        gv->setDSOLocal(true);
     }
 
     // Generate `jl_dispatch_fvars_idxs` and `jl_dispatch_fvars_offsets`
@@ -1017,12 +1024,14 @@ void CloneCtx::emit_metadata()
                                       GlobalVariable::ExternalLinkage,
                                       idxval, "jl_clone_idxs" + suffix);
         gv1->setVisibility(GlobalValue::HiddenVisibility);
+        gv1->setDSOLocal(true);
         ArrayType *offsets_type = ArrayType::get(Type::getInt32Ty(M.getContext()), offsets.size());
         auto gv2 = new GlobalVariable(M, offsets_type, true,
                                       GlobalVariable::ExternalLinkage,
                                       ConstantArray::get(offsets_type, offsets),
                                       "jl_clone_offsets" + suffix);
         gv2->setVisibility(GlobalValue::HiddenVisibility);
+        gv2->setDSOLocal(true);
     }
 }
 
@@ -1145,7 +1154,8 @@ Pass *createMultiVersioningPass(bool allow_bad_fvars)
     return new MultiVersioningLegacy(allow_bad_fvars);
 }
 
-extern "C" JL_DLLEXPORT void LLVMExtraAddMultiVersioningPass_impl(LLVMPassManagerRef PM)
+extern "C" JL_DLLEXPORT_CODEGEN
+void LLVMExtraAddMultiVersioningPass_impl(LLVMPassManagerRef PM)
 {
     unwrap(PM)->add(createMultiVersioningPass(false));
 }

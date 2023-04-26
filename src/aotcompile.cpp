@@ -96,7 +96,7 @@ typedef struct {
     std::vector<jl_code_instance_t*> jl_external_to_llvm;
 } jl_native_code_desc_t;
 
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void jl_get_function_id_impl(void *native_code, jl_code_instance_t *codeinst,
         int32_t *func_idx, int32_t *specfunc_idx)
 {
@@ -110,7 +110,7 @@ void jl_get_function_id_impl(void *native_code, jl_code_instance_t *codeinst,
     }
 }
 
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void jl_get_llvm_gvs_impl(void *native_code, arraylist_t *gvs)
 {
     // map a memory location (jl_value_t or jl_binding_t) to a GlobalVariable
@@ -119,7 +119,7 @@ void jl_get_llvm_gvs_impl(void *native_code, arraylist_t *gvs)
     memcpy(gvs->items, data->jl_value_to_llvm.data(), gvs->len * sizeof(void*));
 }
 
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void jl_get_llvm_external_fns_impl(void *native_code, arraylist_t *external_fns)
 {
     jl_native_code_desc_t *data = (jl_native_code_desc_t*)native_code;
@@ -128,7 +128,7 @@ void jl_get_llvm_external_fns_impl(void *native_code, arraylist_t *external_fns)
         external_fns->len * sizeof(jl_code_instance_t*));
 }
 
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 LLVMOrcThreadSafeModuleRef jl_get_llvm_module_impl(void *native_code)
 {
     jl_native_code_desc_t *data = (jl_native_code_desc_t*)native_code;
@@ -138,7 +138,7 @@ LLVMOrcThreadSafeModuleRef jl_get_llvm_module_impl(void *native_code)
         return NULL;
 }
 
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 GlobalValue* jl_get_llvm_function_impl(void *native_code, uint32_t idx)
 {
     jl_native_code_desc_t *data = (jl_native_code_desc_t*)native_code;
@@ -265,7 +265,7 @@ static void jl_ci_cache_lookup(const jl_cgparams_t &cgparams, jl_method_instance
 // The `policy` flag switches between the default mode `0` and the extern mode `1` used by GPUCompiler.
 // `_imaging_mode` controls if raw pointers can be embedded (e.g. the code will be loaded into the same session).
 // `_external_linkage` create linkages between pkgimages.
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void *jl_create_native_impl(jl_array_t *methods, LLVMOrcThreadSafeModuleRef llvmmod, const jl_cgparams_t *cgparams, int _policy, int _imaging_mode, int _external_linkage, size_t _world)
 {
     JL_TIMING(NATIVE_AOT, NATIVE_Create);
@@ -432,6 +432,7 @@ void *jl_create_native_impl(jl_array_t *methods, LLVMOrcThreadSafeModuleRef llvm
         G->setInitializer(ConstantPointerNull::get(cast<PointerType>(G->getValueType())));
         G->setLinkage(GlobalValue::ExternalLinkage);
         G->setVisibility(GlobalValue::HiddenVisibility);
+        G->setDSOLocal(true);
         data->jl_sysimg_gvars.push_back(G);
     }
     CreateNativeGlobals += gvars.size();
@@ -456,6 +457,7 @@ void *jl_create_native_impl(jl_array_t *methods, LLVMOrcThreadSafeModuleRef llvm
             if (!G.isDeclaration()) {
                 G.setLinkage(GlobalValue::ExternalLinkage);
                 G.setVisibility(GlobalValue::HiddenVisibility);
+                G.setDSOLocal(true);
                 makeSafeName(G);
                 if (TT.isOSWindows() && TT.getArch() == Triple::x86_64) {
                     // Add unwind exception personalities to functions to handle async exceptions
@@ -523,6 +525,7 @@ static GlobalVariable *emit_shard_table(Module &M, Type *T_size, Type *T_psize, 
             auto gv = new GlobalVariable(M, T_size, constant,
                                          GlobalValue::ExternalLinkage, nullptr, name + suffix);
             gv->setVisibility(GlobalValue::HiddenVisibility);
+            gv->setDSOLocal(true);
             return gv;
         };
         auto table = tables.data() + i * sizeof(jl_image_shard_t) / sizeof(void *);
@@ -540,6 +543,7 @@ static GlobalVariable *emit_shard_table(Module &M, Type *T_size, Type *T_psize, 
     auto tables_gv = new GlobalVariable(M, tables_arr->getType(), false,
                                         GlobalValue::ExternalLinkage, tables_arr, "jl_shard_tables");
     tables_gv->setVisibility(GlobalValue::HiddenVisibility);
+    tables_gv->setDSOLocal(true);
     return tables_gv;
 }
 
@@ -550,12 +554,15 @@ static GlobalVariable *emit_ptls_table(Module &M, Type *T_size, Type *T_psize) {
         new GlobalVariable(M, T_size, false, GlobalValue::ExternalLinkage, Constant::getNullValue(T_size), "jl_pgcstack_key_slot"),
         new GlobalVariable(M, T_size, false, GlobalValue::ExternalLinkage, Constant::getNullValue(T_size), "jl_tls_offset"),
     };
-    for (auto &gv : ptls_table)
+    for (auto &gv : ptls_table) {
         cast<GlobalVariable>(gv)->setVisibility(GlobalValue::HiddenVisibility);
+        cast<GlobalVariable>(gv)->setDSOLocal(true);
+    }
     auto ptls_table_arr = ConstantArray::get(ArrayType::get(T_psize, ptls_table.size()), ptls_table);
     auto ptls_table_gv = new GlobalVariable(M, ptls_table_arr->getType(), false,
                                             GlobalValue::ExternalLinkage, ptls_table_arr, "jl_ptls_table");
     ptls_table_gv->setVisibility(GlobalValue::HiddenVisibility);
+    ptls_table_gv->setDSOLocal(true);
     return ptls_table_gv;
 }
 
@@ -1197,11 +1204,13 @@ static void construct_vars(Module &M, Partition &partition) {
                                         GlobalVariable::ExternalLinkage,
                                         fidxs, "jl_fvar_idxs");
     fidxs_var->setVisibility(GlobalValue::HiddenVisibility);
+    fidxs_var->setDSOLocal(true);
     auto gidxs = ConstantDataArray::get(M.getContext(), gvar_idxs);
     auto gidxs_var = new GlobalVariable(M, gidxs->getType(), true,
                                         GlobalVariable::ExternalLinkage,
                                         gidxs, "jl_gvar_idxs");
     gidxs_var->setVisibility(GlobalValue::HiddenVisibility);
+    gidxs_var->setDSOLocal(true);
 }
 
 // Materialization will leave many unused declarations, which multiversioning would otherwise clone.
@@ -1450,7 +1459,7 @@ static unsigned compute_image_thread_count(const ModuleInfo &info) {
 
 // takes the running content that has collected in the shadow module and dump it to disk
 // this builds the object file portion of the sysimage files for fast startup
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void jl_dump_native_impl(void *native_code,
         const char *bc_fname, const char *unopt_bc_fname, const char *obj_fname,
         const char *asm_fname,
@@ -1556,6 +1565,7 @@ void jl_dump_native_impl(void *native_code,
                                             GlobalVariable::ExternalLinkage,
                                             gidxs, "jl_gvar_idxs");
         gidxs_var->setVisibility(GlobalValue::HiddenVisibility);
+        gidxs_var->setDSOLocal(true);
         idxs.clear();
         idxs.resize(data->jl_sysimg_fvars.size());
         std::iota(idxs.begin(), idxs.end(), 0);
@@ -1564,6 +1574,7 @@ void jl_dump_native_impl(void *native_code,
                                             GlobalVariable::ExternalLinkage,
                                             fidxs, "jl_fvar_idxs");
         fidxs_var->setVisibility(GlobalValue::HiddenVisibility);
+        fidxs_var->setDSOLocal(true);
         dataM->addModuleFlag(Module::Error, "julia.mv.suffix", MDString::get(Context, "_0"));
 
         // reflect the address of the jl_RTLD_DEFAULT_handle variable
@@ -1988,7 +1999,7 @@ static RegisterPass<JuliaPipeline<0,true>> XS("juliaO0-sysimg", "Runs the entire
 static RegisterPass<JuliaPipeline<2,true>> YS("julia-sysimg", "Runs the entire julia pipeline (at -O2/sysimg mode)", false, false);
 static RegisterPass<JuliaPipeline<3,true>> ZS("juliaO3-sysimg", "Runs the entire julia pipeline (at -O3/sysimg mode)", false, false);
 
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void jl_add_optimization_passes_impl(LLVMPassManagerRef PM, int opt_level, int lower_intrinsics) {
     addOptimizationPasses(unwrap(PM), opt_level, lower_intrinsics);
 }
@@ -1998,7 +2009,7 @@ void jl_add_optimization_passes_impl(LLVMPassManagerRef PM, int opt_level, int l
 // for use in reflection from Julia.
 // this is paired with jl_dump_function_ir, jl_dump_function_asm, jl_dump_method_asm in particular ways:
 // misuse will leak memory or cause read-after-free
-extern "C" JL_DLLEXPORT
+extern "C" JL_DLLEXPORT_CODEGEN
 void jl_get_llvmf_defn_impl(jl_llvmf_dump_t* dump, jl_method_instance_t *mi, size_t world, char getwrapper, char optimize, const jl_cgparams_t params)
 {
     if (jl_is_method(mi->def.method) && mi->def.method->source == NULL &&

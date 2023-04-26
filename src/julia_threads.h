@@ -276,13 +276,13 @@ typedef struct _jl_tls_states_t {
     )
 
     // some hidden state (usually just because we don't have the type's size declaration)
-#ifdef LIBRARY_EXPORTS
+#ifdef JL_LIBRARY_EXPORTS
     uv_mutex_t sleep_lock;
     uv_cond_t wake_signal;
 #endif
 } jl_tls_states_t;
 
-#ifndef LIBRARY_EXPORTS
+#ifndef JL_LIBRARY_EXPORTS
 // deprecated (only for external consumers)
 JL_DLLEXPORT void *jl_get_ptls_states(void);
 #endif
