@@ -1045,7 +1045,7 @@ STATIC_INLINE jl_value_t *jl_svecset(
 #else
 STATIC_INLINE jl_value_t *jl_svecref(void *t JL_PROPAGATES_ROOT, size_t i) JL_NOTSAFEPOINT
 {
-    assert(jl_typeis(t,jl_simplevector_type));
+    assert(jl_typetagis(t,jl_simplevector_tag << 4));
     assert(i < jl_svec_len(t));
     // while svec is supposedly immutable, in practice we sometimes publish it first
     // and set the values lazily
@@ -1055,7 +1055,7 @@ STATIC_INLINE jl_value_t *jl_svecset(
     void *t JL_ROOTING_ARGUMENT JL_PROPAGATES_ROOT,
     size_t i, void *x JL_ROOTED_ARGUMENT) JL_NOTSAFEPOINT
 {
-    assert(jl_typeis(t,jl_simplevector_type));
+    assert(jl_typetagis(t,jl_simplevector_tag << 4));
     assert(i < jl_svec_len(t));
     // while svec is supposedly immutable, in practice we sometimes publish it
     // first and set the values lazily. Those users occasionally might need to
@@ -1111,13 +1111,13 @@ STATIC_INLINE jl_value_t *jl_array_ptr_set(
 STATIC_INLINE uint8_t jl_array_uint8_ref(void *a, size_t i) JL_NOTSAFEPOINT
 {
     assert(i < jl_array_len(a));
-    assert(jl_typeis(a, jl_array_uint8_type));
+    assert(jl_typetagis(a, jl_array_uint8_type));
     return ((uint8_t*)(jl_array_data(a)))[i];
 }
 STATIC_INLINE void jl_array_uint8_set(void *a, size_t i, uint8_t x) JL_NOTSAFEPOINT
 {
     assert(i < jl_array_len(a));
-    assert(jl_typeis(a, jl_array_uint8_type));
+    assert(jl_typetagis(a, jl_array_uint8_type));
     ((uint8_t*)(jl_array_data(a)))[i] = x;
 }
 

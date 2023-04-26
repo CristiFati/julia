@@ -1255,7 +1255,7 @@ JL_DLLEXPORT void jl_array_ptr_copy(jl_array_t *dest, void **dest_p,
 
 JL_DLLEXPORT void jl_array_ptr_1d_push(jl_array_t *a, jl_value_t *item)
 {
-    assert(jl_typeis(a, jl_array_any_type));
+    assert(jl_typetagis(a, jl_array_any_type));
     jl_array_grow_end(a, 1);
     size_t n = jl_array_nrows(a);
     jl_array_ptr_set(a, n - 1, item);
@@ -1263,8 +1263,8 @@ JL_DLLEXPORT void jl_array_ptr_1d_push(jl_array_t *a, jl_value_t *item)
 
 JL_DLLEXPORT void jl_array_ptr_1d_append(jl_array_t *a, jl_array_t *a2)
 {
-    assert(jl_typeis(a, jl_array_any_type));
-    assert(jl_typeis(a2, jl_array_any_type));
+    assert(jl_typetagis(a, jl_array_any_type));
+    assert(jl_typetagis(a2, jl_array_any_type));
     size_t i;
     size_t n = jl_array_nrows(a);
     size_t n2 = jl_array_nrows(a2);

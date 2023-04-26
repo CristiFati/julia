@@ -53,7 +53,7 @@ static int typeenv_has_ne(jl_typeenv_t *env, jl_tvar_t *v) JL_NOTSAFEPOINT
 static int layout_uses_free_typevars(jl_value_t *v, jl_typeenv_t *env)
 {
     while (1) {
-        if (jl_typeis(v, jl_tvar_type))
+        if (jl_is_typevar(v))
             return !typeenv_has(env, (jl_tvar_t*)v);
         while (jl_is_unionall(v)) {
             jl_unionall_t *ua = (jl_unionall_t*)v;
@@ -108,7 +108,7 @@ static int layout_uses_free_typevars(jl_value_t *v, jl_typeenv_t *env)
 static int has_free_typevars(jl_value_t *v, jl_typeenv_t *env) JL_NOTSAFEPOINT
 {
     while (1) {
-        if (jl_typeis(v, jl_tvar_type)) {
+        if (jl_is_typevar(v)) {
             return !typeenv_has(env, (jl_tvar_t*)v);
         }
         while (jl_is_unionall(v)) {
@@ -162,7 +162,7 @@ JL_DLLEXPORT int jl_has_free_typevars(jl_value_t *v) JL_NOTSAFEPOINT
 static void find_free_typevars(jl_value_t *v, jl_typeenv_t *env, jl_array_t *out)
 {
     while (1) {
-        if (jl_typeis(v, jl_tvar_type)) {
+        if (jl_is_typevar(v)) {
             if (!typeenv_has(env, (jl_tvar_t*)v))
                 jl_array_ptr_1d_push(out, v);
             return;
@@ -219,7 +219,7 @@ JL_DLLEXPORT jl_array_t *jl_find_free_typevars(jl_value_t *v)
 static int jl_has_bound_typevars(jl_value_t *v, jl_typeenv_t *env) JL_NOTSAFEPOINT
 {
     while (1) {
-        if (jl_typeis(v, jl_tvar_type)) {
+        if (jl_is_typevar(v)) {
             return typeenv_has_ne(env, (jl_tvar_t*)v);
         }
         while (jl_is_unionall(v)) {
