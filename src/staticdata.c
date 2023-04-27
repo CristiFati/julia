@@ -1946,6 +1946,9 @@ static void jl_update_all_fptrs(jl_serializer_state *s, jl_image_t *image)
     image->fptrs.base = NULL;
     if (fvars.base == NULL)
         return;
+
+    memcpy(image->small_typeof, &small_typeof, sizeof(small_typeof));
+
     int img_fvars_max = s->fptr_record->size / sizeof(void*);
     size_t i;
     uintptr_t base = (uintptr_t)&s->s->buf[0];
