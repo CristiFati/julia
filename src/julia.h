@@ -110,7 +110,7 @@ JL_EXTENSION struct _jl_taggedvalue_t {
     // jl_value_t value;
 };
 
-static inline jl_value_t *jl_to_typeof(uintptr_t t) JL_NOTSAFEPOINT;
+static inline jl_value_t *jl_to_typeof(uintptr_t t) JL_GLOBALLY_ROOTED JL_NOTSAFEPOINT;
 #ifdef __clang_gcanalyzer__
 JL_DLLEXPORT jl_taggedvalue_t *_jl_astaggedvalue(jl_value_t *v JL_PROPAGATES_ROOT) JL_NOTSAFEPOINT;
 #define jl_astaggedvalue(v) _jl_astaggedvalue((jl_value_t*)(v))
@@ -123,8 +123,6 @@ JL_DLLEXPORT jl_value_t *_jl_typeof(jl_value_t *v JL_PROPAGATES_ROOT) JL_NOTSAFE
     ((jl_taggedvalue_t*)((char*)(v) - sizeof(jl_taggedvalue_t)))
 #define jl_valueof(v)                                                   \
     ((jl_value_t*)((char*)(v) + sizeof(jl_taggedvalue_t)))
-#define jl_typetagof(v)                                                 \
-    ((jl_astaggedvalue(v)->header) & ~(uintptr_t)15)
 #define jl_typeof(v)                                                    \
     jl_to_typeof(jl_typetagof(v))
 #endif
@@ -134,6 +132,8 @@ static inline void jl_set_typeof(void *v, void *t) JL_NOTSAFEPOINT
     jl_taggedvalue_t *tag = jl_astaggedvalue(v);
     jl_atomic_store_relaxed((_Atomic(jl_value_t*)*)&tag->type, (jl_value_t*)t);
 }
+#define jl_typetagof(v)                                                 \
+    ((jl_astaggedvalue(v)->header) & ~(uintptr_t)15)
 #define jl_typeis(v,t) (jl_typeof(v)==(jl_value_t*)(t))
 #define jl_typetagis(v,t) (jl_typetagof(v)==(uintptr_t)(t))
 #define jl_set_typetagof(v,t,gc) (jl_set_typeof((v), (void*)(((uintptr_t)(t) << 4) | (gc))))
@@ -700,16 +700,21 @@ typedef struct {
 
 // constants and type objects -------------------------------------------------
 
-extern JL_DLLEXPORT jl_datatype_t *small_typeof[(64 << 4) / sizeof(jl_datatype_t*)]; // TODO: export this in libjulia
 #define JL_SMALL_TYPEOF(XX) \
     /* kinds */ \
     XX(typeofbottom) \
     XX(datatype) \
     XX(unionall) \
     XX(uniontype) \
-    /* type objects */ \
-    XX(tvar) \
+    /* type parameter objects */ \
     XX(vararg) \
+    XX(tvar) \
+    XX(symbol) \
+    XX(module) \
+    /* special GC objects */ \
+    XX(simplevector) \
+    XX(string) \
+    XX(task) \
     /* bits types with special allocators */ \
     XX(bool) \
     XX(char) \
@@ -724,12 +729,6 @@ extern JL_DLLEXPORT jl_datatype_t *small_typeof[(64 << 4) / sizeof(jl_datatype_t
     XX(uint32) \
     XX(uint64) \
     XX(uint8) \
-    /* special GC objects */ \
-    XX(module) \
-    XX(simplevector) \
-    XX(string) \
-    XX(symbol) \
-    XX(task) \
     /* AST objects */ \
     /* XX(argument) */ \
     /* XX(newvarnode) */ \
@@ -741,14 +740,18 @@ enum jlsmall_typeof_tags {
 #define XX(name) jl_##name##_tag,
     JL_SMALL_TYPEOF(XX)
 #undef XX
-    jl_tags_count
+    jl_tags_count,
+    jl_bitstags_first = jl_char_tag, // n.b. bool is not considered a bitstype, since it can be compared by pointer
+    jl_max_tags = 64
 };
-static inline jl_value_t *jl_to_typeof(uintptr_t t) JL_NOTSAFEPOINT
+extern JL_DLLEXPORT jl_datatype_t *small_typeof[(jl_max_tags << 4) / sizeof(jl_datatype_t*)]; // TODO: export a copy of this in libjulia
+static inline jl_value_t *jl_to_typeof(uintptr_t t)
 {
-    if (t < (64 << 4))
+    if (t < (jl_max_tags << 4))
         return (jl_value_t*)small_typeof[t / sizeof(*small_typeof)];
     return (jl_value_t*)t;
 }
+
 
 // kinds
 extern JL_DLLIMPORT jl_datatype_t *jl_typeofbottom_type JL_GLOBALLY_ROOTED;
@@ -1464,28 +1467,29 @@ STATIC_INLINE int jl_is_array_zeroinit(jl_array_t *a) JL_NOTSAFEPOINT
 // object identity
 JL_DLLEXPORT int jl_egal(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED) JL_NOTSAFEPOINT;
 JL_DLLEXPORT int jl_egal__bits(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, jl_datatype_t *dt) JL_NOTSAFEPOINT;
-JL_DLLEXPORT int jl_egal__special(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, jl_datatype_t *dt) JL_NOTSAFEPOINT;
-JL_DLLEXPORT int jl_egal__unboxed(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, jl_datatype_t *dt) JL_NOTSAFEPOINT;
+JL_DLLEXPORT int jl_egal__bitstag(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, uintptr_t dtag) JL_NOTSAFEPOINT;
+JL_DLLEXPORT int jl_egal__unboxed(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, uintptr_t dtag) JL_NOTSAFEPOINT;
 JL_DLLEXPORT uintptr_t jl_object_id(jl_value_t *v) JL_NOTSAFEPOINT;
 
-STATIC_INLINE int jl_egal__unboxed_(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, jl_datatype_t *dt) JL_NOTSAFEPOINT
+STATIC_INLINE int jl_egal__unboxed_(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED, uintptr_t dtag) JL_NOTSAFEPOINT
 {
-    if (dt->name->mutabl) {
-        if (dt == jl_simplevector_type || dt == jl_string_type || dt == jl_datatype_type)
-            return jl_egal__special(a, b, dt);
-        return 0;
+    if (dtag < jl_max_tags << 4) {
+        if (dtag == jl_symbol_tag << 4 || dtag == jl_bool_tag << 4)
+            return 0;
     }
-    return jl_egal__bits(a, b, dt);
+    else if (((jl_datatype_t*)dtag)->name->mutabl)
+        return 0;
+    return jl_egal__bitstag(a, b, dtag);
 }
 
 STATIC_INLINE int jl_egal_(const jl_value_t *a JL_MAYBE_UNROOTED, const jl_value_t *b JL_MAYBE_UNROOTED) JL_NOTSAFEPOINT
 {
     if (a == b)
         return 1;
-    jl_datatype_t *dt = (jl_datatype_t*)jl_typeof(a);
-    if (dt != (jl_datatype_t*)jl_typeof(b))
+    uintptr_t dtag = jl_typetagof(a);
+    if (dtag != jl_typetagof(b))
         return 0;
-    return jl_egal__unboxed_(a, b, dt);
+    return jl_egal__unboxed_(a, b, dtag);
 }
 #define jl_egal(a, b) jl_egal_((a), (b))
 

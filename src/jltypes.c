@@ -21,7 +21,7 @@ extern "C" {
 
 _Atomic(jl_value_t*) cmpswap_names JL_GLOBALLY_ROOTED;
 
-JL_DLLEXPORT jl_datatype_t *small_typeof[(64 << 4) / sizeof(*small_typeof)]; // 16-bit aligned, like the GC
+JL_DLLEXPORT jl_datatype_t *small_typeof[(jl_max_tags << 4) / sizeof(*small_typeof)]; // 16-bit aligned, like the GC
 
 // compute empirical max-probe for a given size
 #define max_probe(size) ((size) <= 1024 ? 16 : (size) >> 6)

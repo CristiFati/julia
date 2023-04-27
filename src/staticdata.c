@@ -1770,7 +1770,7 @@ static inline uintptr_t get_item_for_reloc(jl_serializer_state *s, uintptr_t bas
 #else
         size_t depsidx = 0;
 #endif
-        assert(depsidx < jl_array_len(s->buildid_depmods_idxs));
+        assert(s->buildid_depmods_idxs && depsidx < jl_array_len(s->buildid_depmods_idxs));
         size_t i = ((uint32_t*)jl_array_data(s->buildid_depmods_idxs))[depsidx];
         assert(2*i < jl_linkage_blobs.len);
         return (uintptr_t)jl_linkage_blobs.items[2*i] + offset*sizeof(void*);
@@ -1864,8 +1864,8 @@ static void jl_read_reloclist(jl_serializer_state *s, jl_array_t *link_ids, uint
         uintptr_t *pv = (uintptr_t *)(base + pos);
         uintptr_t v = *pv;
         v = get_item_for_reloc(s, base, v, link_ids, &link_index);
-        if (bits && ((jl_datatype_t*)v)->smalltag)
-            v = (uintptr_t)((jl_datatype_t*)v)->smalltag << 4; // temporary(jwn)
+        if (bits && v && ((jl_datatype_t*)v)->smalltag)
+            v = (uintptr_t)((jl_datatype_t*)v)->smalltag << 4; // TODO: should we have a representation that supports sweep without a relocation step?
         *pv = v | bits;
     }
     assert(!link_ids || link_index == jl_array_len(link_ids));
@@ -2906,8 +2906,7 @@ static void jl_restore_system_image_from_stream_(ios_t *f, jl_image_t *image, jl
             *tag = jl_read_value(&s);
         }
 #define XX(name) \
-        if (jl_##name##_tag != (uintptr_t)jl_##name##_type >> 4) /*temporary(jwn)*/ \
-            small_typeof[(jl_##name##_tag << 4) / sizeof(*small_typeof)] = jl_##name##_type;
+        small_typeof[(jl_##name##_tag << 4) / sizeof(*small_typeof)] = jl_##name##_type;
         JL_SMALL_TYPEOF(XX)
 #undef XX
         jl_global_roots_table = (jl_array_t*)jl_read_value(&s);

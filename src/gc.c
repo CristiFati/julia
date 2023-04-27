@@ -2247,7 +2247,7 @@ STATIC_INLINE void gc_mark_stack(jl_ptls_t ptls, jl_gcframe_t *s, uint32_t nroot
                     continue;
                 // conservatively check for the presence of any smalltag type, instead of just NULL
                 // in the very unlikely event that codegen decides to root the result of julia.typeof
-                if (new_obj < (jl_value_t*)((uintptr_t)64 << 4))
+                if (new_obj < (jl_value_t*)((uintptr_t)jl_max_tags << 4))
                     continue;
             }
             gc_try_claim_and_push(mq, new_obj, NULL);
@@ -2413,7 +2413,7 @@ FORCE_INLINE void gc_mark_outrefs(jl_ptls_t ptls, jl_gc_markqueue_t *mq, void *_
             // so we want these to fall through to the end
             vtag = (uintptr_t)small_typeof[vtag / sizeof(*small_typeof)];
         }
-        else if (vtag < 64 << 4) {
+        else if (vtag < jl_max_tags << 4) {
             // these objects either have specialing handling
             if (vtag == jl_simplevector_tag << 4) {
                 size_t l = jl_svec_len(new_obj);
