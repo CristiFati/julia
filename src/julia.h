@@ -744,7 +744,7 @@ enum jlsmall_typeof_tags {
     jl_bitstags_first = jl_char_tag, // n.b. bool is not considered a bitstype, since it can be compared by pointer
     jl_max_tags = 64
 };
-extern JL_DLLEXPORT jl_datatype_t *small_typeof[(jl_max_tags << 4) / sizeof(jl_datatype_t*)]; // TODO: export a copy of this in libjulia
+extern jl_datatype_t *small_typeof[(jl_max_tags << 4) / sizeof(jl_datatype_t*)];
 static inline jl_value_t *jl_to_typeof(uintptr_t t)
 {
     if (t < (jl_max_tags << 4))
