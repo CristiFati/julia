@@ -160,10 +160,12 @@ static void emit_offset_table(Module &mod, const std::vector<GlobalValue*> &vars
         addrs[i] = ConstantExpr::getBitCast(var, T_psize);
     }
     ArrayType *vars_type = ArrayType::get(T_psize, nvars);
-    new GlobalVariable(mod, vars_type, true,
+    auto GV = new GlobalVariable(mod, vars_type, true,
                        GlobalVariable::ExternalLinkage,
                        ConstantArray::get(vars_type, addrs),
                        name);
+    GV->setVisibility(GlobalValue::HiddenVisibility);
+    GV->setDSOLocal(true);
 }
 
 static bool is_safe_char(unsigned char c)
@@ -1108,6 +1110,8 @@ static void materializePreserved(Module &M, Partition &partition) {
             if (!Preserve.contains(&F)) {
                 F.deleteBody();
                 F.setLinkage(GlobalValue::ExternalLinkage);
+                F.setVisibility(GlobalValue::HiddenVisibility);
+                F.setDSOLocal(true);
             }
         }
     }
@@ -1116,6 +1120,8 @@ static void materializePreserved(Module &M, Partition &partition) {
             if (!Preserve.contains(&GV)) {
                 GV.setInitializer(nullptr);
                 GV.setLinkage(GlobalValue::ExternalLinkage);
+                GV.setVisibility(GlobalValue::HiddenVisibility);
+                GV.setDSOLocal(true);
             }
         }
     }
@@ -1137,7 +1143,8 @@ static void materializePreserved(Module &M, Partition &partition) {
                     GA.setAliasee(F);
 
                     DeletedAliases.push_back({ &GA, F });
-                } else {
+                }
+                else {
                     auto GV = new GlobalVariable(M, GA.getValueType(), false, GlobalValue::ExternalLinkage, Constant::getNullValue(GA.getValueType()));
                     DeletedAliases.push_back({ &GA, GV });
                 }
@@ -1215,17 +1222,13 @@ static void construct_vars(Module &M, Partition &partition) {
 
 // Materialization will leave many unused declarations, which multiversioning would otherwise clone.
 // This function removes them to avoid unnecessary cloning of declarations.
-static void dropUnusedDeclarations(Module &M) {
-    SmallVector<GlobalValue *> unused;
+// The GlobalDCEPass is much better at this, but we only care about removing unused
+// declarations, not actually about seeing if code is dead (codegen knows it is live, by construction).
+static void dropUnusedGlobals(Module &M) {
+    std::vector<GlobalValue *> unused;
     for (auto &G : M.global_values()) {
-        if (G.isDeclaration()) {
-            if (G.use_empty()) {
-                unused.push_back(&G);
-            } else {
-                G.setDSOLocal(false); // These are never going to be seen in the same module again
-                G.setVisibility(GlobalValue::DefaultVisibility);
-            }
-        }
+        if (G.isDeclaration() && G.use_empty())
+            unused.push_back(&G);
     }
     for (auto &G : unused)
         G->eraseFromParent();
@@ -1364,7 +1367,7 @@ static void add_output(Module &M, TargetMachine &TM, std::vector<std::string> &o
             timers[i].construct.stopTimer();
 
             timers[i].deletion.startTimer();
-            dropUnusedDeclarations(*M);
+            dropUnusedGlobals(*M);
             timers[i].deletion.stopTimer();
 
             add_output_impl(*M, TM, outputs_start + i * outcount, names_start + i * outcount,

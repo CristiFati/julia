@@ -159,6 +159,7 @@ void jl_link_global(GlobalVariable *GV, void *addr) JL_NOTSAFEPOINT
     else {
         GV->setConstant(true);
         GV->setLinkage(GlobalValue::PrivateLinkage);
+        GV->setVisibility(GlobalValue::DefaultVisibility);
         GV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
     }
 }

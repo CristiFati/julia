@@ -495,15 +495,16 @@ void CloneCtx::prepare_slots()
     for (auto &F : orig_funcs) {
         if (F->hasFnAttribute("julia.mv.reloc")) {
             assert(F->hasFnAttribute("julia.mv.clones"));
+            GlobalVariable *GV = new GlobalVariable(M, F->getType(), false, GlobalValue::ExternalLinkage, nullptr, F->getName() + ".reloc_slot");
+            GV->setVisibility(GlobalValue::HiddenVisibility);
+            GV->setDSOLocal(true);
             if (F->isDeclaration()) {
-                auto GV = new GlobalVariable(M, F->getType(), false, GlobalValue::ExternalLinkage, nullptr, F->getName() + ".reloc_slot");
                 extern_relocs[F] = GV;
-            } else {
+            }
+            else {
                 auto id = get_func_id(F);
-                auto GV = new GlobalVariable(M, F->getType(), false, GlobalValue::ExternalLinkage, Constant::getNullValue(F->getType()), F->getName() + ".reloc_slot");
-                GV->setVisibility(GlobalValue::HiddenVisibility);
-                GV->setDSOLocal(true);
                 const_relocs[id] = GV;
+                GV->setInitializer(Constant::getNullValue(F->getType()));
             }
         }
     }
@@ -757,7 +758,8 @@ std::pair<uint32_t,GlobalVariable*> CloneCtx::get_reloc_slot(Function *F) const
         auto extern_decl = extern_relocs.find(F);
         assert(extern_decl != extern_relocs.end() && "Missing extern relocation slot!");
         return {(uint32_t)-1, extern_decl->second};
-    } else {
+    }
+    else {
         auto id = get_func_id(F);
         auto slot = const_relocs.find(id);
         assert(slot != const_relocs.end() && "Missing relocation slot!");
