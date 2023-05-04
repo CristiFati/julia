@@ -1575,6 +1575,12 @@ static unsigned type_hash(jl_value_t *kj, int *failed) JL_NOTSAFEPOINT
     }
 }
 
+JL_DLLEXPORT uintptr_t jl_type_hash(jl_value_t *v) JL_NOTSAFEPOINT
+{
+    int *failed = 0;
+    return type_hash(v, failed);
+}
+
 static unsigned typekey_hash(jl_typename_t *tn, jl_value_t **key, size_t n, int nofail) JL_NOTSAFEPOINT
 {
     if (tn == jl_type_typename && key[0] == jl_bottom_type)
