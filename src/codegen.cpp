@@ -9147,7 +9147,9 @@ extern "C" JL_DLLEXPORT void jl_init_codegen_impl(void)
 extern "C" JL_DLLEXPORT void jl_teardown_codegen_impl() JL_NOTSAFEPOINT
 {
     // output LLVM timings and statistics
-    jl_ExecutionEngine->printTimers();
+    // Guard against exits before we have initialized the ExecutionEngine
+    if (jl_ExecutionEngine)
+        jl_ExecutionEngine->printTimers();
     PrintStatistics();
 }
 
