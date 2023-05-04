@@ -181,6 +181,7 @@ void jl_timing_printf(jl_timing_block_t *cur_block, const char *format, ...);
 
 #define JL_TIMING_COUNTERS \
         X(Invalidations) \
+        X(HeapSize) \
 
 
 enum jl_timing_owners {
