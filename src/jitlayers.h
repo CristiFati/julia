@@ -98,7 +98,7 @@ struct OptimizationOptions {
 
 // LLVM's new pass manager is scheduled to replace the legacy pass manager
 // for middle-end IR optimizations.
-#if JL_LLVM_VERSION >= 150000
+#if defined(HAS_SANITIZER) && JL_LLVM_VERSION >= 150000
 #define JL_USE_NEW_PM
 #endif
 
